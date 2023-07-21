@@ -5,7 +5,7 @@ import java.util.Map;
 
 import org.keycloak.Config.Scope;
 
-public class KafkaProducerConfig {
+public class KafkaConfig {
 
 
 	public static Map<String, Object> init(Scope scope) {
@@ -86,7 +86,7 @@ public class KafkaProducerConfig {
 		TRANSACTION_TIMEOUT_MS("transaction.timeout.ms"), //
 		TRANSACTION_ID("transactional.id");
 
-		private String name;
+		private final String name;
 
 		KafkaProperty(String name) {
 			this.name = name;

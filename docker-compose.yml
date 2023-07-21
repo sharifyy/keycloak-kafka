@@ -1,0 +1,80 @@
+version: '2.1'
+
+services:
+
+  zoo:
+    image: confluentinc/cp-zookeeper:latest
+    hostname: zoo
+    container_name: zoo
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_SERVERS: zoo:2888:3888
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    hostname: kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9999:9999"
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka:19092,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
+      KAFKA_ZOOKEEPER_CONNECT: "zoo:2181"
+      KAFKA_BROKER_ID: 1
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_HOSTNAME: ${DOCKER_HOST_IP:-127.0.0.1}
+      KAFKA_CREATE_TOPICS: "keycloak-events:1:1"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    depends_on:
+      - zoo
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:21.1.1
+    hostname: keycloak
+    container_name: keycloak
+    command: ["start-dev"]
+    ports:
+      - "8080:8080"
+    depends_on:
+      - kafka
+      - postgres
+    volumes:
+      - ./target/keycloak-kafka-1.0-SNAPSHOT-jar-with-dependencies.jar:/opt/keycloak/providers/keycloak-kafka-1.0-SNAPSHOT-jar-with-dependencies.jar
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KAFKA_TOPIC: keycloak-events
+      KAFKA_CLIENT_ID: my-kafka-client
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres/keycloak
+      KC_DB_USERNAME: admin
+      KC_DB_PASSWORD: admin
+  postgres:
+    image: postgres:15.0
+    container_name: postgres
+    volumes:
+      - postgres-keycloak-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: admin
+      POSTGRES_USER: admin
+      POSTGRES_DB: keycloak
+
+volumes:
+  kafka-data:
+  zookeeper-data:
+  postgres-keycloak-data:
